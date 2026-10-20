@@ -1,0 +1,5 @@
+import {readFileSync,readdirSync,existsSync} from 'node:fs';
+import {join,dirname,resolve} from 'node:path';
+import {spawnSync} from 'node:child_process';
+const root=resolve('dist');let checked=0;
+function walk(dir){for(const file of readdirSync(dir,{withFileTypes:true})){const path=join(dir,file.name);if(file.isDirectory())walk(path);else if(file.name.endsWith('.js')){const r=spawnSync(process.execPath,['--check',path],{encoding:'utf8'});if(r.status!==0)throw Error(r.stderr);checked++}else if(file.name.endsWith('.html')){const html=readFileSync(path,'utf8');if(!html.includes('name="viewport"'))throw Error('Missing viewport: '+path);for(const [,url]of html.matchAll(/(?:href|src)="([^"]+)"/g)){if(/^(?:https?:|mailto:|data:|#)/.test(url))continue;const target=resolve(dirname(path),url.split('#')[0]);if(!existsSync(target))throw Error('Broken local link: '+path+' → '+url)}for(const [,code]of html.matchAll(/<script>([\s\S]*?)<\/script>/g))new Function(code);checked++}}}walk(root);console.log(`Validated ${checked} HTML / JavaScript files and their local asset links.`);
